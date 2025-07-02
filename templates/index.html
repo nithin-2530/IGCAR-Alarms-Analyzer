@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <title>Anomaly Detection Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="page-header">
+    <h1>Anomaly Detection Dashboard</h1>
+    <p>Upload your Excel file to detect and visualize system anomalies interactively.</p>
+    </header>
+
+
+    <form id="uploadForm" action="/upload" method="POST" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
+        <button type="submit">Upload</button>
+    </form>
+
+    <div id="progress-container" style="display: none; margin-top: 20px;">
+        <label for="progress">Processing File:</label>
+        <progress id="progress" value="0" max="100" style="width: 100%;"></progress>
+        <span id="progress-text">0%</span>
+    </div>
+
+    <hr>
+
+    {% if plot_div %}
+        <h3>📈 Interactive Anomaly Map</h3>
+        {{ plot_div | safe }}
+    {% endif %}
+
+
+{% if stats %}
+    <hr>
+    <div class="custom-collapse">
+        <div class="collapse-header" onclick="toggleCollapse()">
+            <span id="collapse-icon">▶</span>
+            <h3 style="display: inline;">📊 Summary Statistics</h3>
+        </div>
+        <div class="collapse-body" id="collapse-content">
+            <div class="stat-grid">
+    <div class="stat-card">
+        <h4>Total Rows</h4>
+        <p>{{ stats.total_rows }}</p>
+    </div>
+    <div class="stat-card">
+        <h4>Anomalies</h4>
+        <p>{{ stats.total_anomalies }}</p>
+    </div>
+    <div class="stat-card">
+        <h4>Correct Alarms</h4>
+        <p>{{ stats.correct_alarms }}</p>
+    </div>
+</div>
+
+
+            <div style="margin-top: 20px;">
+<!-- Two-Column Breakdown -->
+<h4>📌 Tags with Anomalies</h4>
+<div class="two-column">
+    <ul id="tag-list">
+        {% for tag, count in stats.all_tags.items() %}
+            <li class="tag-item"{% if loop.index > 5 %} style="display: none;"{% endif %}>
+                {{ tag }} — {{ count }} anomalies
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+{% if stats.all_tags|length > 5 %}
+<button onclick="toggleList('tag')" class="toggle">Show More</button>
+{% endif %}
+
+<h4>📌 Systems with Anomalies</h4>
+<div class="two-column">
+    <ul id="system-list">
+        {% for system, count in stats.all_systems.items() %}
+            <li class="system-item"{% if loop.index > 5 %} style="display: none;"{% endif %}>
+                {{ system }} — {{ count }} anomalies
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+{% if stats.all_systems|length > 5 %}
+<button onclick="toggleList('system')" class="toggle">Show More</button>
+{% endif %}
+
+<h4>📌 Tag + System Pairs with Anomalies</h4>
+<div class="two-column">
+    <ul id="pair-list">
+        {% for item in stats.all_pairs %}
+            <li class="pair-item"{% if loop.index > 5 %} style="display: none;"{% endif %}>
+                {{ item.tag }} + {{ item.system }} — {{ item.count }} anomalies
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+{% if stats.all_pairs|length > 5 %}
+<button onclick="toggleList('pair')" class="toggle">Show More</button>
+{% endif %}
+
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+
+
+
+    {% if download_url %}
+        <p><a href="{{ download_url }}" download>📥 Download Annotated Excel File</a></p>
+    {% endif %}
+
+
+    <!-- Progress Bar Script -->
+    <script>
+        const form = document.getElementById('uploadForm');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress');
+        const progressText = document.getElementById('progress-text');
+
+        form.addEventListener('submit', function () {
+            progressContainer.style.display = 'block';
+            progressBar.value = 0;
+            progressText.textContent = "0%";
+
+            const interval = setInterval(() => {
+                fetch('/progress')
+                    .then(response => response.json())
+                    .then(data => {
+                        progressBar.value = data.percent;
+                        progressText.textContent = data.percent + "%";
+                        if (data.percent >= 100) {
+                            clearInterval(interval);
+                        }
+                    });
+            }, 500);
+        });
+    </script>
+
+    <!-- Show More Toggle Script -->
+    <script>
+        function toggleList(type) {
+            const items = document.querySelectorAll(`.${type}-item`);
+            const button = event.target;
+            const isHidden = Array.from(items).slice(5).some(item => item.style.display === 'none');
+
+            if (isHidden) {
+                items.forEach(item => item.style.display = 'list-item');
+                button.textContent = 'Show Less';
+            } else {
+                items.forEach((item, i) => {
+                    item.style.display = i < 5 ? 'list-item' : 'none';
+                });
+                button.textContent = 'Show More';
+            }
+        }
+    </script>
+
+    <script>
+    function toggleCollapse() {
+        const content = document.getElementById('collapse-content');
+        const icon = document.getElementById('collapse-icon');
+
+        content.classList.toggle('open');
+        icon.classList.toggle('open');
+
+        // Save to localStorage
+        localStorage.setItem('summaryOpen', content.classList.contains('open'));
+    }
+
+    // On load: restore collapse state
+    window.addEventListener('DOMContentLoaded', () => {
+        const content = document.getElementById('collapse-content');
+        const icon = document.getElementById('collapse-icon');
+        const isOpen = localStorage.getItem('summaryOpen') === 'true';
+
+        if (isOpen) {
+            content.classList.add('open');
+            icon.classList.add('open');
+        }
+    });
+    </script>
+
+
+</body>
+</html>

@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: anomaly-detector
+    env: python
+    buildCommand: ""
+    startCommand: gunicorn app:app
+    plan: free
